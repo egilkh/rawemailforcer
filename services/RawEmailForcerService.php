@@ -17,13 +17,13 @@ class RawEmailForcerService extends BaseApplicationComponent
    */
   private $_defaultEmailTimeout = 10;
 
-  /**
-   * Handles event to attach files to email if properly configured
-   *
-   * @param Event $event
-   */
-  public function handleOnBeforeSendEmail(Event &$event)
-  {
+  public function init() {
+    parent::init();
+
+    RawEmailForcerPlugin::log('Creating service.', LogLevel::Info);
+  }
+
+  public function handleOnBeforeSendEmail (Event $event) {
     RawEmailForcerPlugin::log('handleOnBeforeSendEmail()', LogLevel::Info);
 
     $emailModel = $event->params['emailModel'];
@@ -61,23 +61,14 @@ class RawEmailForcerService extends BaseApplicationComponent
       $user->lastName = $emailModel->toLastName;
     }
 
-    return $this->_sendEmail($user, $emailModel, $variables);
+    $this->_sendEmail($user, $emailModel, $variables);
+
+    $event->handled = true;
+
+    RawEmailForcerPlugin::log('/handleOnBeforeSendEmail()', LogLevel::Info);
   }
 
-  /**
-   * Returns the system email settings defined in Settings → Email.
-   *
-   * @return array The system email settings.
-   */
-  public function getSettings()
-  {
-    if (!isset($this->_settings))
-    {
-      $this->_settings = craft()->systemSettings->getSettings('email');
-    }
 
-    return $this->_settings;
-  }
 
   // Private Methods
   // =========================================================================
@@ -97,26 +88,21 @@ class RawEmailForcerService extends BaseApplicationComponent
 
     if (!isset($emailSettings['protocol']))
     {
-      RawEmailForcerPlugin::log('Not good times.', LogLevel::Info);
+      RawEmailForcerPlugin::log('Could not determine how to send the email.  Check your email settings.', LogLevel::Info);
       throw new Exception(Craft::t('Could not determine how to send the email.  Check your email settings.'));
     }
 
     $email = new \PHPMailer(true);
 
+    // Enable high debug messages.
     $email->SMTPDebug = 2;
-
-    RawEmailForcerPlugin::log('1', LogLevel::Info);
-
-    // Default the charset to UTF-8
     $email->CharSet = 'UTF-8';
 
-    // Add a reply to (if any).  Make sure it’s set before setting From, because email is dumb.
     if (!empty($emailModel->replyTo))
     {
       $email->addReplyTo($emailModel->replyTo);
     }
 
-    RawEmailForcerPlugin::log('2', LogLevel::Info);
     // Set the "from" information.
     $email->setFrom($emailModel->fromEmail, $emailModel->fromName);
 
@@ -165,9 +151,9 @@ class RawEmailForcerService extends BaseApplicationComponent
       }
 
       default:
-        {
+      {
         $email->isMail();
-        }
+      }
     }
 
     if (!$this->_processTestToEmail($email, 'Address'))
@@ -239,17 +225,7 @@ class RawEmailForcerService extends BaseApplicationComponent
 
     RawEmailForcerPlugin::log('$email->Send()', LogLevel::Info);
 
-    $s = false;
-
-    try {
-      $email->Send();
-    } catch (Exception $e) {
-      RawEmailForcerPlugin::log(Craft::t('Email error: {error}', array('error' => $email->ErrorInfo)), LogLevel::Info);
-    }
-
-    RawEmailForcerPlugin::log('/$email->Send()', LogLevel::Info);
-
-    if (!$s)
+    if (!$email->Send())
     {
       RawEmailForcerPlugin::log(Craft::t('Email error: {error}', array('error' => $email->ErrorInfo)), LogLevel::Info);
       throw new Exception(Craft::t('Email error: {error}', array('error' => $email->ErrorInfo)));
@@ -261,10 +237,25 @@ class RawEmailForcerService extends BaseApplicationComponent
     $this->onSendEmail(new Event($this, array(
       'user' => $user,
       'emailModel' => $emailModel,
-      'variables'  => $variables
+      'variables'  => $variables,
     )));
 
     return true;
+  }
+
+  /**
+   * Returns the system email settings defined in Settings → Email.
+   *
+   * @return array The system email settings.
+   */
+  public function getSettings()
+  {
+    if (!isset($this->_settings))
+    {
+      $this->_settings = craft()->systemSettings->getSettings('email');
+    }
+
+    return $this->_settings;
   }
 
   /**
@@ -320,7 +311,7 @@ class RawEmailForcerService extends BaseApplicationComponent
     $email->Timeout = $emailSettings['timeout'];
   }
 
-  /**
+    /**
    * @param $email
    * @param $method
    *

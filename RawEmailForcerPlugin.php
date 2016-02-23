@@ -1,5 +1,4 @@
 <?php
-
 namespace Craft;
 
 /**
@@ -51,8 +50,7 @@ class RawEmailForcerPlugin extends BasePlugin
 
   public function init()
   {
-    parent::init();
-
+    RawEmailForcerPlugin::log('Adding hook');
     craft()->on('email.onBeforeSendEmail', array(rawEmailForcer(), 'handleOnBeforeSendEmail'));
   }
 
